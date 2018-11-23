@@ -1,0 +1,6 @@
+.git/**
+.vscode/**
+.ipynb_checkpoints/**
+data/**
+log/**
+*.ipynb

@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+simpleitk = "*"
+numpy = "*"
+tqdm = "*"
+opencv-python = "*"
+matplotlib = "*"
+
+[dev-packages]
+pylint = "*"
+
+[requires]
+python_version = "3.6"
