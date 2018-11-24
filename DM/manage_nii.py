@@ -30,6 +30,10 @@ class NiiFileManager(FileManager):
         self.img = sitk.GetArrayFromImage(self.sitk_img).astype(np.float32)
         self.loaded = True
 
+    def normalize(self):
+        self.img = self.img / self.img.max() * 255
+        self.img = self.img.astype(np.uint8)
+
     @nii_check_loaded
     def get_slice(self, start, end=None, dim=0):
         assert isinstance(dim, int) and dim in [0, 1, 2]
@@ -40,13 +44,9 @@ class NiiFileManager(FileManager):
             (isinstance(end, int) and start <= end <= self.size[dim])
         )
 
-        if dim is 0:
-            img_slice = self.img[start, :, :] if end is None else self.img[start:end, :, :]
-        elif dim is 1:
-            img_slice = self.img[:, start, :] if end is None else self.img[:, start:end, :]
-        else:
-            img_slice = self.img[:, :, start] if end is None else self.img[:, :, start:end]
-        return img_slice
+        img_slice = self.img if dim is 0 else np.rollaxis(self.img, dim)
+        return img_slice[start] if end is None else img_slice[start:end]
+
 
     @nii_check_loaded
     def show(self, pos, dim=0):

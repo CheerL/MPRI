@@ -3,4 +3,6 @@
 .ipynb_checkpoints/**
 data/**
 log/**
+**/__pycache__/**
 *.ipynb
+Pipfile.lock

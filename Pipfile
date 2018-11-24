@@ -9,9 +9,12 @@ numpy = "*"
 tqdm = "*"
 opencv-python = "*"
 matplotlib = "*"
+scikit-image = "*"
+scipy = "*"
 
 [dev-packages]
 pylint = "*"
+autopep8 = "*"
 
 [requires]
 python_version = "3.6"
