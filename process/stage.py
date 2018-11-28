@@ -125,8 +125,7 @@ class FirstStageProcess(ImageProcess):
             )
 
     def get_upper_brainstem(self, img, region_1_mask, rate=2.2, test=False):
-        region_1_img = img.copy()
-        region_1_img[~region_1_mask] = 0
+        region_1_img = img * region_1_mask
         region_1_otsu = self.get_otsu(region_1_img)
         region_1_bin_img = self.get_binary_image(region_1_img, region_1_otsu * rate)
         label, info = self.get_connected_component(region_1_bin_img)
@@ -190,8 +189,8 @@ class FirstStageProcess(ImageProcess):
         clahe_img = self.get_clahe_image(img, clahe_limit, clahe_row, clahe_col)
         clahe_otsu = self.get_otsu(clahe_img)
         clahe_bin_img = self.get_binary_image(clahe_img, clahe_otsu + 255 * clahe_bin_add)
-        clahe_bin_img[brainstem] = 0
-        clahe_bin_img[~region_1_mask] = 0
+        clahe_bin_img = clahe_bin_img * ~brainstem * region_1_mask
+
         label, info = self.get_connected_component(clahe_bin_img, min_area)
         info = self.get_near_component(label, info, brainstem, max_distance, type_='area')
         try:
@@ -237,7 +236,7 @@ class FirstStageProcess(ImageProcess):
 
 
 class SecendStageProcess(ImageProcess):
-    def get_region_2_mask(self, shape, point, angle, height=50, width=70, ):
+    def get_region_2_mask(self, shape, point, angle=160, height=50, width=70):
         return self.get_region_mask(shape, point, height, width, angle)
 
     def get_silces_2(self, nii, num=30, dim=0):

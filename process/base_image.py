@@ -2,6 +2,8 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
+# from component import ConnectedComponent
+
 class ImageProcess(object):
     @staticmethod
     def get_mid_silces(nii, num, dim=0):
@@ -142,6 +144,20 @@ class ImageProcess(object):
             for y in range(height):
                 for x in range(width-1, 0, -1):
                     if img[y, :x].any():
+                        img[y, x] = img.max()
+                    else:
+                        break
+        elif side == 'u':
+            for x in range(width):
+                for y in range(height-1, 0, -1):
+                    if img[:y, x].any():
+                        img[y, x] = img.max()
+                    else:
+                        break
+        elif side == 'd':
+            for x in range(width):
+                for y in range(height):
+                    if img[y:, x].any():
                         img[y, x] = img.max()
                     else:
                         break
