@@ -2,15 +2,9 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-# from component import ConnectedComponent
+from component import ConnectedComponent
 
 class ImageProcess(object):
-    @staticmethod
-    def get_mid_silces(nii, num, dim=0):
-        dim_size = nii.size[dim]
-        start, end = int((dim_size - num) / 2), int((dim_size + num) / 2)
-        return nii.get_slice(start, end, dim)
-
     @staticmethod
     def get_otsu(img, only_otsu=True):
         otsu, otsu_img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -43,14 +37,18 @@ class ImageProcess(object):
     @staticmethod
     def get_connected_component(img, min_area=0, sort=True):
         _, label, stats, centroids = cv2.connectedComponentsWithStats(img)
-        info = [
-            (level, stat, ImageProcess.get_revese_point(centroid.astype(np.int)))
-            for level, (stat, centroid) in enumerate(zip(stats, centroids))
+        components = [
+            ConnectedComponent(
+                label == level,
+                level,
+                stat,
+                ImageProcess.get_revese_point(centroid.astype(np.int))
+            ) for level, (stat, centroid) in enumerate(zip(stats, centroids))
             if stat[4] > min_area and level != 0
         ]
         if sort:
-            info.sort(key=lambda x: x[1][4], reverse=True)
-        return label, info
+            components = sorted(components, reverse=True)
+        return components, label
 
     @staticmethod
     def get_area_distance(img, point):
@@ -63,29 +61,25 @@ class ImageProcess(object):
         return point[1], point[0]
 
     @staticmethod
-    def add_points(img, points, size=5, color=127, reverse=True):
-        def is_point(point):
-            try:
-                if (
-                        isinstance(point, (tuple, list, np.ndarray)) and
-                        len(point) == 2 and (
-                            isinstance(point[0], int) or
-                            point[0].dtype in (np.int, np.int16, np.int32, np.int64)
-                        ) and (
-                            isinstance(point[1], int) or
-                            point[1].dtype in (np.int, np.int16, np.int32, np.int64)
-                        )
-                ):
-                    return True
-            except AttributeError:
-                pass
-            return False
+    def is_point(point):
+        check_dtype = lambda num: num.dtype in (np.int, np.int16, np.int32, np.int64)
+        try:
+            if (isinstance(point, (tuple, list, np.ndarray)) and
+                    len(point) == 2 and
+                    (isinstance(point[0], int) or check_dtype(point[0])) and
+                    (isinstance(point[1], int) or check_dtype(point[1]))):
+                return True
+        except AttributeError:
+            pass
+        return False
 
-        if is_point(points):
+    @staticmethod
+    def add_points(img, points, size=5, color=127, reverse=True):
+        if ImageProcess.is_point(points):
             points = [points]
         else:
             for point in points:
-                assert is_point(point)
+                assert ImageProcess.is_point(point)
         if img.dtype == bool:
             img = img.astype(np.uint8) * 255
 
