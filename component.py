@@ -53,3 +53,9 @@ class ConnectedComponent(object):
         else:
             raise TypeError()
         return bound_point
+
+    def in_range(self, point, strict=False):
+        if strict:
+            return self.img[point]
+        else:
+            return self.up <= point[0] < self.down and self.left <= point[1] < self.right

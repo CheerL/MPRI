@@ -22,22 +22,6 @@ class FirstStageProcess(ImageProcess):
             )
         ]
 
-    def get_near_component(self, compoents, pos, limit, type_='point'):
-        assert type_ in ('point', 'area')
-        if type_ == 'point':
-            near_component = [
-                compoent
-                for compoent in compoents
-                if self.get_area_distance(compoent.img, pos) < limit
-            ]
-        elif type_ == 'area':
-            near_component = [
-                compoent
-                for compoent in compoents
-                if self.get_area_distance(pos, compoent.centroid) < limit
-            ]
-        return near_component
-
     def get_corpus(self, img, clahe_limit=0.02, clahe_row=8, clahe_col=8,
                    clahe_bin_add=0.2, center_rate=1/4,
                    min_area=200, max_distance=45,
@@ -48,11 +32,11 @@ class FirstStageProcess(ImageProcess):
         clahe_img = self.get_clahe_image(img, clahe_limit, clahe_row, clahe_col)
         clahe_otsu = self.get_otsu(clahe_img)
         clahe_bin_img = self.get_binary_image(clahe_img, clahe_otsu + 255 * clahe_bin_add)
-        compoents, label = self.get_connected_component(clahe_bin_img, min_area)
-        compoents = self.get_center_component(compoents, center_rate)
-        compoents = self.get_near_component(compoents, center, max_distance)
+        components, label = self.get_connected_component(clahe_bin_img, min_area)
+        components = self.get_center_component(components, center_rate)
+        components = self.get_near_component(components, center, max_distance)
         try:
-            corpus = compoents[0]
+            corpus = components[0]
         except IndexError:
             corpus = label
 
@@ -73,7 +57,7 @@ class FirstStageProcess(ImageProcess):
         height = int(width * rate)
         diff_y, diff_x = right_bound[0] - left_bound[0], right_bound[1] - left_bound[1]
         angle = -np.rad2deg(np.arctan(diff_y / diff_x))
-        return self.get_region_mask(
+        return self.get_rect_mask(
             component.shape,
             right_bound if upside else left_bound,
             height, width,
@@ -188,10 +172,10 @@ class FirstStageProcess(ImageProcess):
 
 class SecendStageProcess(ImageProcess):
     def get_region_2_mask(self, shape, point, angle=175, height=40, width=50):
-        return self.get_region_mask(shape, point, height, width, angle)
+        return self.get_rect_mask(shape, point, height, width, angle)
 
-    def get_silces_2(self, nii, midsagittal_num, num=30, dim=0):
-        start, end = int(midsagittal_num - num / 2), int(midsagittal_num + num / 2)
+    def get_silces_2(self, nii, mid_num, num=30, dim=0):
+        start, end = int(mid_num - num / 2), int(mid_num + num / 2)
         return nii.get_slice(start, end, dim)
 
     def get_mcp(self, img, region_2_mask, rate=2, test=False):
@@ -290,5 +274,72 @@ class SecendStageProcess(ImageProcess):
         return np.mean(mcp_slice_length)
 
 
-class ThirdStage(ImageProcess):
-    pass
+class ThirdStageProcess(ImageProcess):
+    def get_silces_3(self, nii, point, num, dim=0):
+        mid_num = point[1]
+        start, end = int(mid_num - num / 2), int(mid_num + num / 2)
+        return nii.get_slice(start, end, dim)
+
+    def get_region_3_mask(self, slice_3, point, real_mid_num,
+                          height=25, width=20):
+        start_point = (point[0]-int(height/2), real_mid_num-int(width/2))
+        return self.get_rect_mask(slice_3[0].shape, start_point, height, width)
+
+    def get_region_component(self, img, region_3, rate=0.14, min_area=10, test=False):
+        region_img = img * region_3
+        otsu = self.get_otsu(img)
+        bin_img = self.get_binary_image(region_img, otsu+rate*255)
+        components, label = self.get_connected_component(bin_img, min_area)
+        if test:
+            test_data = {
+                'masked_img': region_img,
+                'otsu': otsu,
+                'bin_img': bin_img,
+                'label': label
+            }
+            return components, test_data
+        return components
+
+    def get_scp_slice_num(self, components, slice_3, reverse=True):
+        for num, component in enumerate(reversed(components)) if reverse else components:
+            if len(component) == 3:
+                return len(slice_3) - num - 1 if reverse else num
+
+    def get_scp_peduncle(self, img, point,
+                         clahe_limit=0.03, clahe_row=8, clahe_col=8,
+                         clahe_bin_add=0.28, min_area=10, max_distance=10,
+                         test=False):
+        clahe_img = self.get_clahe_image(img, clahe_limit, clahe_row, clahe_col)
+        clahe_otsu = self.get_otsu(clahe_img)
+        clahe_bin_img = self.get_binary_image(clahe_img, clahe_otsu + 255 * clahe_bin_add)
+
+        components, label = self.get_connected_component(clahe_bin_img, min_area)
+        components = self.get_near_component(components, point, max_distance)
+        components = [
+            component for component in components
+            if not component.in_range(point)
+        ]
+        if test:
+            test_data = {
+                'clahe_img': clahe_img,
+                'clahe_bin_img': clahe_bin_img,
+                'clahe_otsu': clahe_otsu,
+                'label': label
+            }
+            return components, test_data
+        return components
+
+    def get_scp_width(self, component):
+        contours = cv2.findContours(
+            component.img_uint8,
+            cv2.RETR_TREE,
+            cv2.CHAIN_APPROX_NONE
+            )
+        min_rect = cv2.minAreaRect(contours[1][0])
+        # box = np.int32(np.around(cv2.boxPoints(min_rect)))
+        box = cv2.boxPoints(min_rect)
+        return min(
+            self.get_distance(box[0], box[1]),
+            self.get_distance(box[0], box[2]),
+            self.get_distance(box[0], box[3])
+        )

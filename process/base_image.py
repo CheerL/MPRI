@@ -51,6 +51,21 @@ class ImageProcess(object):
         return components, label
 
     @staticmethod
+    def get_near_component(components, pos, limit, type_='point'):
+        assert type_ in ('point', 'area')
+        if type_ == 'point':
+            near_component = [
+                component for component in components
+                if ImageProcess.get_area_distance(component.img, pos) < limit
+            ]
+        elif type_ == 'area':
+            near_component = [
+                component for component in components
+                if ImageProcess.get_area_distance(pos, component.centroid) < limit
+            ]
+        return near_component
+
+    @staticmethod
     def get_area_distance(img, point):
         area_points = list(zip(*np.where(img)))
         distances = [ImageProcess.get_distance(area_point, point) for area_point in area_points]
@@ -87,7 +102,7 @@ class ImageProcess(object):
         for point in points:
             if reverse:
                 point = ImageProcess.get_revese_point(point)
-            backgorund = cv2.circle(background, point, size, color, -1)
+            backgorund = cv2.circle(background, tuple(point), size, color, -1)
         return backgorund
 
     @staticmethod
@@ -167,13 +182,14 @@ class ImageProcess(object):
         return (int(point_y + diff_y), int(point_x + diff_x))
 
     @staticmethod
-    def get_region_mask(shape, point, height, width, angle):
+    def get_rect_mask(shape, point, height, width, angle=0):
         canvas_height, canvas_width = shape
         canvas = np.zeros((canvas_height, canvas_width))
         start_point = ImageProcess.get_revese_point(point)
         end_point = (point[1] + width, point[0] + height)
         rect = cv2.rectangle(canvas, start_point, end_point, 255, -1)
-        rot_matrix = cv2.getRotationMatrix2D(start_point, angle, 1)
-        rot_shape = (canvas_width, canvas_height)
-        rect = cv2.warpAffine(rect, rot_matrix, rot_shape, flags=cv2.INTER_LINEAR)
+        if angle:
+            rot_matrix = cv2.getRotationMatrix2D(start_point, angle, 1)
+            rot_shape = (canvas_width, canvas_height)
+            rect = cv2.warpAffine(rect, rot_matrix, rot_shape, flags=cv2.INTER_LINEAR)
         return rect.astype(bool)
