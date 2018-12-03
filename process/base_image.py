@@ -183,13 +183,16 @@ class ImageProcess(object):
 
     @staticmethod
     def get_rect_mask(shape, point, height, width, angle=0):
-        canvas_height, canvas_width = shape
-        canvas = np.zeros((canvas_height, canvas_width))
         start_point = ImageProcess.get_revese_point(point)
         end_point = (point[1] + width, point[0] + height)
+        canvas_height, canvas_width = shape
+        canvas = np.zeros((
+            max(canvas_height, end_point[1]),
+            max(canvas_width, end_point[0])
+            ))
         rect = cv2.rectangle(canvas, start_point, end_point, 255, -1)
         if angle:
             rot_matrix = cv2.getRotationMatrix2D(start_point, angle, 1)
             rot_shape = (canvas_width, canvas_height)
             rect = cv2.warpAffine(rect, rot_matrix, rot_shape, flags=cv2.INTER_LINEAR)
-        return rect.astype(bool)
+        return rect.astype(bool)[:canvas_height+1, :canvas_width+1]
