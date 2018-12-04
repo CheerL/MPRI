@@ -1,4 +1,7 @@
+import cv2
 import numpy as np
+from process import base_process
+
 
 class ConnectedComponent(object):
     def __init__(self, img, level, stat, centroid):
@@ -17,6 +20,20 @@ class ConnectedComponent(object):
 
     def __le__(self, other):
         return self.area <= other.area
+
+    @staticmethod
+    def get_connected_component(img, min_area=0, sort=True):
+        _, label, stats, centroids = cv2.connectedComponentsWithStats(img)
+        components = [
+            ConnectedComponent(
+                label == level, level, stat,
+                base_process.get_revese_point(centroid.astype(np.int))
+            ) for level, (stat, centroid) in enumerate(zip(stats, centroids))
+            if stat[4] > min_area and level != 0
+        ]
+        if sort:
+            components = sorted(components, reverse=True)
+        return components, label
 
     @property
     def img_uint8(self):
@@ -54,8 +71,18 @@ class ConnectedComponent(object):
             raise TypeError()
         return bound_point
 
-    def in_range(self, point, strict=False):
-        if strict:
-            return self.img[point]
-        else:
+    def __contains__(self, point):
+        if base_process.is_point(point):
             return self.up <= point[0] < self.down and self.left <= point[1] < self.right
+        return False
+
+    def in_range(self, left=None, right=None, up=None, down=None):
+        if left is not None and left > self.left:
+            return False
+        if right is not None and right < self.right:
+            return False
+        if up is not None and up > self.up:
+            return False
+        if down is not None and down < self.down:
+            return False
+        return True

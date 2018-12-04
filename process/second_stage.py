@@ -1,12 +1,12 @@
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 
-from process.base_image import ImageProcess
+from component import ConnectedComponent
+from process import base_process
 
-class SecondStageProcess(ImageProcess):
+class SecondStageProcess(object):
     def get_region_2_mask(self, shape, point, angle=175, height=40, width=50):
-        return self.get_rect_mask(shape, point, height, width, angle)
+        return base_process.get_rect_mask(shape, point, height, width, angle)
 
     def get_silces_2(self, nii, mid_num, num=30, dim=0):
         start, end = int(mid_num - num / 2), int(mid_num + num / 2)
@@ -14,9 +14,9 @@ class SecondStageProcess(ImageProcess):
 
     def get_mcp(self, img, region_2_mask, rate=2, test=False):
         region_2_img = img * region_2_mask
-        region_2_otsu = self.get_otsu(region_2_img)
-        region_2_bin_img = self.get_binary_image(region_2_img, region_2_otsu * rate)
-        components, label = self.get_connected_component(region_2_bin_img)
+        region_2_otsu = base_process.get_otsu(region_2_img)
+        region_2_bin_img = base_process.get_binary_image(region_2_img, region_2_otsu * rate)
+        components, label = ConnectedComponent.get_connected_component(region_2_bin_img)
 
         try:
             mcp = components[0]
@@ -36,7 +36,7 @@ class SecondStageProcess(ImageProcess):
     def get_mcp_part_seg_point(self, part, min_dis=2, type_='u', quality=0.001):
         assert type_ in ['u', 'd']
         points = [
-            self.get_revese_point(point)
+            base_process.get_revese_point(point)
             for point in np.concatenate(
                 cv2.goodFeaturesToTrack(
                     part.img_uint8,
@@ -65,7 +65,7 @@ class SecondStageProcess(ImageProcess):
 
         part_img[mcp.up-1, left_bound:right_bound] = 255
         part_img[mcp.down, left_bound:right_bound] = 255
-        components, label = self.get_connected_component(part_img, min_area=min_part_area)
+        components, _ = ConnectedComponent.get_connected_component(part_img, min_part_area)
         assert len(components) == 2
         up_part, down_part = sorted(components, key=lambda x: x.centroid[0])
         up_point = self.get_mcp_part_seg_point(up_part, min_dis, 'u', quality)
@@ -77,7 +77,7 @@ class SecondStageProcess(ImageProcess):
                 if mcp.img[y, x]:
                     ext_img[y, x] = 255
 
-        components, _ = self.get_connected_component(ext_img, min_area=5)
+        components, _ = ConnectedComponent.get_connected_component(ext_img, 5)
         assert components
         ext_part = components[0]
         ext_point = ext_part.get_bound_point('u')
@@ -86,7 +86,7 @@ class SecondStageProcess(ImageProcess):
     def get_mcp_slice_length(self, up_point, down_point, ext_point,
                              sup_limit=15, inf_limit=4):
         if inf_limit < abs(up_point[0] - ext_point[0]) < sup_limit:
-            return self.get_distance(up_point, down_point)
+            return base_process.get_distance(up_point, down_point)
         raise AttributeError()
 
     def get_mcp_length(self, slices_2, region_2, rate=2,
