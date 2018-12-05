@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from process import base_process
+import process
 
 
 class ConnectedComponent(object):
@@ -27,7 +27,7 @@ class ConnectedComponent(object):
         components = [
             ConnectedComponent(
                 label == level, level, stat,
-                base_process.get_revese_point(centroid.astype(np.int))
+                process.get_revese_point(centroid.astype(np.int))
             ) for level, (stat, centroid) in enumerate(zip(stats, centroids))
             if stat[4] > min_area and level != 0
         ]
@@ -72,7 +72,7 @@ class ConnectedComponent(object):
         return bound_point
 
     def __contains__(self, point):
-        if base_process.is_point(point):
+        if process.is_point(point):
             return self.up <= point[0] < self.down and self.left <= point[1] < self.right
         return False
 
