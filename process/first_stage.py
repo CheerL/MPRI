@@ -4,17 +4,9 @@ import numpy as np
 import config
 import process
 from component import ConnectedComponent
-from process.base_stage import BaseStageProcess
+from process.base_stage import (BaseStageProcess, TooLessException,
+                                TooManyException, TooSmallExceotion)
 
-
-class TooLessException(Exception):
-    pass
-
-class TooManyException(Exception):
-    pass
-
-class NotEnoughException(Exception):
-    pass
 
 class FirstStageProcess(BaseStageProcess):
     def __init__(self):
@@ -26,6 +18,7 @@ class FirstStageProcess(BaseStageProcess):
         self.mid_mask = None
         self.mid_corpus = None
         self.mid_upper_brainstem = None
+        self.real_mid_num = None
         self.brainstem = None
         self.quad = None
         self.up_brainstem_point = None
@@ -38,7 +31,7 @@ class FirstStageProcess(BaseStageProcess):
             self.brainstem = self.get_brainstem()
 
         def brainstem_exception(error):
-            if isinstance(error, (IndexError, NotEnoughException)):
+            if isinstance(error, (IndexError, TooSmallExceotion)):
                 self.para['get_brainstem']['clahe_bin_add'] -= 0.01
             else:
                 raise error
@@ -82,6 +75,7 @@ class FirstStageProcess(BaseStageProcess):
         self.error_retry(quad_run, quad_exception)
         self.error_retry(brainstem_seg_run, brainstem_seg_exception)
         self.quad_point = self.get_quad_seg_point()
+        self.real_mid_num = self.get_real_mid_num()
 
     def show(self):
         process.show([
@@ -125,7 +119,7 @@ class FirstStageProcess(BaseStageProcess):
                 'clahe_bin_add': 0.2, #0.15 for MSA
                 'center_rate': 1/4,
                 'min_area': 200,
-                'max_distance': 45,
+                'max_dis': 45,
                 'clahe_col': config.CALHE_COL,
                 'clahe_row': config.CALHE_ROW,
             },
@@ -136,7 +130,7 @@ class FirstStageProcess(BaseStageProcess):
                 'clahe_limit': 0.02,
                 'clahe_bin_add': 0.15,
                 'min_area': 500,
-                'max_distance': 5,
+                'max_dis': 5,
                 'clahe_col': config.CALHE_COL,
                 'clahe_row': config.CALHE_ROW,
                 'diff': 5
@@ -146,7 +140,7 @@ class FirstStageProcess(BaseStageProcess):
                 'clahe_bin_add': 0.15,
                 'min_area': 15,
                 'max_area': 50,
-                'max_distance': 8,
+                'max_dis': 8,
                 'clahe_col': config.CALHE_COL,
                 'clahe_row': config.CALHE_ROW,
             },
@@ -176,8 +170,13 @@ class FirstStageProcess(BaseStageProcess):
             (180 - angle if upside else -angle)
             )
 
+    def get_real_mid_num(self):
+        dim = self.para['get_slices']['dim']
+        num = self.para['get_slices']['num']
+        return int((self.nii.size[dim] - num) / 2) + self.mid_num
+
     def get_corpus(self, img, clahe_limit, clahe_bin_add, center_rate,
-                   min_area, max_distance, clahe_row, clahe_col, test=False):
+                   min_area, max_dis, clahe_row, clahe_col, test=False):
         _, bin_img = process.get_otsu(img, False)
         center = process.get_grav_center(bin_img)
         clahe_img = process.get_clahe_image(img, clahe_limit, clahe_row, clahe_col)
@@ -193,7 +192,7 @@ class FirstStageProcess(BaseStageProcess):
                 down=img.shape[0] * (1 - center_rate)
             )
         ]
-        components = process.get_near_component(components, center, max_distance)
+        components = process.get_near_component(components, center, max_dis)
         corpus = components[0]
 
         if test:
@@ -232,16 +231,16 @@ class FirstStageProcess(BaseStageProcess):
         return numed_upper_brainstems[0][0]
 
     def get_brainstem(self, clahe_limit, clahe_bin_add, clahe_row, clahe_col,
-                      min_area, max_distance, diff, test=False):
+                      min_area, max_dis, diff, test=False):
         center = process.get_grav_center(self.mid_upper_brainstem.img_uint8)
         clahe_img = process.get_clahe_image(self.mid_img, clahe_limit, clahe_row, clahe_col)
         clahe_otsu = process.get_otsu(clahe_img)
         clahe_bin_img = process.get_binary_image(clahe_img, clahe_otsu + 255 * clahe_bin_add)
         components, label = ConnectedComponent.get_connected_component(clahe_bin_img, min_area)
-        components = process.get_near_component(components, center, max_distance)
+        components = process.get_near_component(components, center, max_dis)
         brainstem = components[0]
         if self.mid_upper_brainstem.down - brainstem.down > diff:
-            raise NotEnoughException
+            raise TooSmallExceotion('Brainstem is too small.')
 
         if test:
             test_data = {
@@ -255,7 +254,7 @@ class FirstStageProcess(BaseStageProcess):
         return brainstem
 
     def get_quad(self, clahe_limit, clahe_bin_add, clahe_row, clahe_col,
-                 min_area, max_area, max_distance, test=False):
+                 min_area, max_area, max_dis, test=False):
         clahe_img = process.get_clahe_image(self.mid_img, clahe_limit, clahe_row, clahe_col)
         clahe_otsu = process.get_otsu(clahe_img)
         clahe_bin_img = process.get_binary_image(clahe_img, clahe_otsu + 255 * clahe_bin_add)
@@ -264,7 +263,7 @@ class FirstStageProcess(BaseStageProcess):
         components, label = ConnectedComponent.get_connected_component(clahe_bin_img, min_area)
         components = [component for component in components if component.area < max_area]
         components = process.get_near_component(
-            components, self.mid_upper_brainstem.img, max_distance, type_='area'
+            components, self.mid_upper_brainstem.img, max_dis, type_='area'
         )
         quadrigeminal = components[0]
 

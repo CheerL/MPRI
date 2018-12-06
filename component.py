@@ -21,6 +21,13 @@ class ConnectedComponent(object):
     def __le__(self, other):
         return self.area <= other.area
 
+    def __add__(self, other):
+        if isinstance(other, ConnectedComponent):
+            return self.img_bool + other.img_bool
+        elif isinstance(other, np.ndarray):
+            return self.img_bool + other
+        raise TypeError('ConnectedComponent must add with ConnectedComponent or numpy.ndarray')
+
     @staticmethod
     def get_connected_component(img, min_area=0, sort=True):
         _, label, stats, centroids = cv2.connectedComponentsWithStats(img)

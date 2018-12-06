@@ -1,5 +1,20 @@
 import functools
 
+class TooBigException(Exception):
+    pass
+
+class TooSmallExceotion(Exception):
+    pass
+
+class TooLessException(Exception):
+    pass
+
+class TooManyException(Exception):
+    pass
+
+class NotEnoughException(Exception):
+    pass
+
 class BaseStageProcess(object):
     def __init__(self):
         self.nii = None
@@ -17,6 +32,8 @@ class BaseStageProcess(object):
             except Exception as e:
                 exception_action(e)
                 try_time += 1
+        else:
+            raise RuntimeError('Retry to max time.')
 
     def default_para(self, func):
         @functools.wraps(func)
