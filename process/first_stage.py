@@ -5,7 +5,8 @@ import config
 import process
 from component import ConnectedComponent
 from process.base_stage import (BaseStageProcess, TooLessException,
-                                TooManyException, TooSmallExceotion)
+                                TooManyException, TooSmallExceotion,
+                                TooCloseException)
 
 
 class FirstStageProcess(BaseStageProcess):
@@ -80,8 +81,11 @@ class FirstStageProcess(BaseStageProcess):
         def brainstem_seg_exception(error):
             if isinstance(error, TooManyException):
                 self.para['get_brainstem_seg_point']['quality'] += 0.02
+                self.para['get_brainstem_seg_point']['min_corner_dis'] += 2
             elif isinstance(error, TooLessException):
                 self.para['get_brainstem_seg_point']['quality'] -= 0.02
+            elif isinstance(error, TooCloseException):
+                self.para['get_brainstem_seg_point']['min_corner_dis'] += 1
             else:
                 raise error
 
@@ -105,14 +109,22 @@ class FirstStageProcess(BaseStageProcess):
                  np.ones(mask.shape, np.uint8))[0][0])
             for index, (img, mask) in enumerate(zip(self.slices, self.masks))
         ]
+        up_brainstem_cc_dis = [
+            process.get_area_distance(img=upper_brainstem.img, point=corpus.get_bound_point('l'))
+            for upper_brainstem, corpus in zip(self.upper_brainstems, self.corpuses)
+            ]
+        mean_dis = np.mean([dis for dis in up_brainstem_cc_dis if dis > 0])
+        for index, dis in enumerate(up_brainstem_cc_dis):
+            if dis > mean_dis * 1.4:
+                self.filter_nums.remove(index)
         self.mid_num = self.get_mid_num()
         self.mid_img = self.slices[self.mid_num]
         self.mid_mask = self.masks[self.mid_num]
         self.mid_corpus = self.corpuses[self.mid_num]
         self.mid_upper_brainstem = self.upper_brainstems[self.mid_num]
-        self.error_retry(brainstem_run, brainstem_exception, 10)
+        # self.error_retry(brainstem_run, brainstem_exception, 10)
         self.error_retry(quad_run, quad_exception, 10)
-        self.error_retry(brainstem_seg_run, brainstem_seg_exception, 10)
+        self.error_retry(brainstem_seg_run, brainstem_seg_exception, 25)
         self.quad_point = self.get_quad_seg_point()
         self.real_mid_num = self.get_real_mid_num()
 
@@ -120,11 +132,11 @@ class FirstStageProcess(BaseStageProcess):
         process.show([
             self.mid_img,
             self.mid_img * self.mid_mask,
-            process.add_mask(
-                self.mid_img,
-                self.mid_corpus.img_bool +
-                self.brainstem.img_bool
-            ),
+            # process.add_mask(
+            #     self.mid_img,
+            #     self.mid_corpus.img_bool +
+            #     self.brainstem.img_bool
+            # ),
             process.add_mask(
                 self.mid_img,
                 self.mid_upper_brainstem.img_bool
@@ -155,7 +167,7 @@ class FirstStageProcess(BaseStageProcess):
             },
             'get_corpus': {
                 'clahe_limit': 0.02,
-                'bin_rate': config.CORPUS_RATE,
+                'bin_rate': 1.6,
                 'center_rate': 1/4,
                 'min_area': 200,
                 'max_dis': 45,
@@ -163,11 +175,11 @@ class FirstStageProcess(BaseStageProcess):
                 'clahe_row': config.CALHE_ROW,
             },
             'get_upper_brainstem': {
-                'bin_rate': config.BRAINSTEM_RATE
+                'bin_rate': 1.45
             },
             'get_brainstem': {
                 'clahe_limit': 0.02,
-                'bin_rate': config.BRAINSTEM_RATE,
+                'bin_rate': 1.6,
                 'min_area': 500,
                 'max_dis': 5,
                 'clahe_col': config.CALHE_COL,
@@ -186,9 +198,9 @@ class FirstStageProcess(BaseStageProcess):
             'get_brainstem_seg_point': {
                 'close_kernel_size': 3,
                 'max_corner_num': 5,
-                'quality': 0.3,
-                'min_corner_dis': 10,
-                'min_dis': 5
+                'quality': 0.5,
+                'min_corner_dis': 5,
+                'min_dis': 6
             }
         }
 
@@ -289,8 +301,8 @@ class FirstStageProcess(BaseStageProcess):
 
     def get_upper_brainstem(self, img, mask, bin_rate, test=False):
         masked_img = img * mask
-        otsu = process.get_otsu(process.get_limit_img(masked_img))
-        # otsu = process.get_otsu(img)
+        # otsu = process.get_otsu(process.get_limit_img(masked_img))
+        otsu = process.get_otsu(img)
         bin_img = process.get_binary_image(masked_img, otsu * bin_rate)
         components, label = ConnectedComponent.get_connected_component(bin_img)
         upper_brainstem = components[0]
@@ -311,6 +323,10 @@ class FirstStageProcess(BaseStageProcess):
             enumerate(self.upper_brainstems),
             key=lambda x: x[1].area
             )
+        numed_upper_brainstems = [
+            item for item in numed_upper_brainstems
+            if item[0] in self.filter_nums
+        ]
         return numed_upper_brainstems[0][0]
 
     def get_brainstem(self, clahe_limit, bin_rate, clahe_row, clahe_col,
@@ -342,7 +358,7 @@ class FirstStageProcess(BaseStageProcess):
         clahe_img = process.get_clahe_image(self.mid_img, clahe_limit, clahe_row, clahe_col)
         clahe_otsu = process.get_otsu(clahe_img)
         clahe_bin_img = process.get_binary_image(clahe_img, clahe_otsu * bin_rate)
-        clahe_bin_img = clahe_bin_img * ~(self.brainstem.img_bool + self.mid_upper_brainstem.img_bool) * self.mid_mask
+        clahe_bin_img = clahe_bin_img * ~self.mid_upper_brainstem.img_bool * self.mid_mask
         components, label = ConnectedComponent.get_connected_component(clahe_bin_img, min_area)
         components = [component for component in components if component.area <= max_area]
         components = process.get_near_component(
@@ -362,32 +378,47 @@ class FirstStageProcess(BaseStageProcess):
 
     def get_brainstem_seg_point(self, close_kernel_size, max_corner_num,
                                 quality, min_corner_dis, min_dis):
-        img = self.brainstem.img_uint8.copy()
+        upper_brainstem = self.mid_upper_brainstem
+        img = upper_brainstem.img_uint8.copy()
         img = cv2.morphologyEx(
             img, cv2.MORPH_CLOSE,
             np.ones((close_kernel_size, close_kernel_size))
         )
         # process.show(img)
         img = process.get_side_contour(img, 'r')
-        bound_y, bound_x = self.mid_upper_brainstem.get_bound_point('u')
-        img[:bound_y, :bound_x] = 255
-        process.show(img)
+        img[:upper_brainstem.up, :np.where(img[upper_brainstem.up])[0].max()+1] = 255
+        # bound_y, bound_x = self.mid_upper_brainstem.get_bound_point('u')
+        # img[:bound_y, :bound_x] = 255
         corners = cv2.goodFeaturesToTrack(
             img, max_corner_num, quality, min_corner_dis
             ).astype(np.int)
         corners = [process.get_revese_point(point) for point in np.concatenate(corners)]
+        # process.show(process.add_points(img, corners, size=1, color=127))
         corners = [
             point for point in corners
             if (
-                self.brainstem.left + min_dis < point[1] < self.brainstem.right - min_dis and
-                self.brainstem.up + min_dis < point[0] < self.brainstem.down - min_dis
+                upper_brainstem.left + min_dis <= point[1] <= upper_brainstem.right - min_dis and
+                upper_brainstem.up + 1 < point[0] <= upper_brainstem.down - 6
             )
         ]
+        corners = sorted(corners, key=lambda x: x[0])
+        for point in np.array(corners):
+            y = point[0]
+            if y < upper_brainstem.up + 4:
+                if (img[y+1:y+6].sum(axis=1).mean() - img[y].sum()) / 255 < 5:
+                    # print(point, corners)
+                    corners.remove(tuple(point))
+        # print(corners)
+        if len(corners) >= 2 and corners[1][0] - corners[0][0] < 10:
+            # print(corners, corners[0][0] - corners[1][0])
+            del corners[1]
+
         if len(corners) < 2:
             raise TooLessException('Too less points found when segement brainstem')
         elif len(corners) > 2:
             raise TooManyException('Too many points found when segement brainstem')
-        return sorted(corners, key=lambda x: x[0])
+
+        return corners
 
     def get_quad_seg_point(self):
         return self.quad.get_bound_point('u')

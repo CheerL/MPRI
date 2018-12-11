@@ -13,6 +13,9 @@ class TooLessException(Exception):
 class TooManyException(Exception):
     pass
 
+class TooCloseException(Exception):
+    pass
+
 class NotEnoughException(Exception):
     pass
 
