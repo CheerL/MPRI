@@ -54,6 +54,7 @@ class SecondStageProcess(BaseStageProcess):
         self.nii = nii
         self.angle = self.get_rotate_angle(stage)
         self.slices = self.get_slices(stage)
+        self.slice_normalize()
         self.mask = self.get_region_mask(
             stage.mid_img.shape, stage.up_brainstem_point
         )

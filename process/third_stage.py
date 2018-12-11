@@ -68,6 +68,7 @@ class ThirdStageProcess(BaseStageProcess):
 
         self.nii = nii
         self.slices = self.get_slices(stage.quad_point)
+        self.slice_normalize()
         self.mask = self.get_region_mask(stage.quad_point, stage.real_mid_num)
         self.scp_components = [
             self.get_scp_components(img) for img in self.slices

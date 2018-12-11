@@ -1,4 +1,5 @@
 import functools
+import process
 
 class TooBigException(Exception):
     pass
@@ -27,8 +28,7 @@ class BaseStageProcess(object):
         try_time = 0
         while try_time < max_try_time:
             try:
-                func()
-                break
+                return func()
             except Exception as e:
                 exception_action(e)
                 try_time += 1
@@ -63,3 +63,6 @@ class BaseStageProcess(object):
 
     def init_para(self):
         raise NotImplementedError()
+
+    def slice_normalize(self):
+        self.slices = [process.normalize(img) for img in self.slices]

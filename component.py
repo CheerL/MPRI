@@ -14,6 +14,7 @@ class ConnectedComponent(object):
         self.down = stat[1] + stat[3]
         self.area = stat[4]
         self.centroid = centroid
+        self.info = None
 
     def __lt__(self, other):
         return self.area < other.area

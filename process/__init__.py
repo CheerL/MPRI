@@ -177,3 +177,6 @@ def show(imgs, dim=0, size=6):
         else:
             assert isinstance(img, np.ndarray)
             ax.imshow(img, 'gray')
+
+def normalize(img):
+    return (img / img.max() * 255).astype(np.uint8)
