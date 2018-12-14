@@ -26,17 +26,23 @@ class BaseStageProcess(object):
         self.para = self.init_para()
         self.bind_default_para()
 
-    @staticmethod
-    def error_retry(func, exception_action, max_try_time=5):
+    def error_retry(self, func, exception_action, max_try_time=5):
         try_time = 0
-        while try_time < max_try_time:
+        while True:
             try:
                 return func()
-            except Exception as e:
-                exception_action(e)
+            except Exception as error:
+                exception_action(error)
                 try_time += 1
-        else:
-            raise RuntimeError('Retry to max time.')
+                if try_time >= max_try_time:
+                    raise RuntimeError(
+                        'Retry to max %d time in %s of %s: %s' % (
+                            try_time,
+                            func.__code__.co_name,
+                            type(self).__qualname__,
+                            str(error)
+                            )
+                        )
 
     def default_para(self, func):
         @functools.wraps(func)

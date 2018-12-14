@@ -15,6 +15,8 @@ class SecondStageProcess(BaseStageProcess):
         self.mcp_seg_num = None
         self.mcp_length = None
         self.mcp_mean_length = None
+        self.real_mid_num = None
+        self.up_brainstem_point = None
         super().__init__()
 
     def init_para(self):
@@ -52,6 +54,8 @@ class SecondStageProcess(BaseStageProcess):
 
     def run(self, nii, stage):
         self.nii = nii
+        self.real_mid_num = stage.real_mid_num
+        self.up_brainstem_point = stage.up_brainstem_point
         self.angle = self.get_rotate_angle(stage)
         self.slices = self.get_slices(stage)
         self.slice_normalize()
@@ -80,16 +84,16 @@ class SecondStageProcess(BaseStageProcess):
         process.show([
             process.add_points(
                 process.add_mask(self.slices[num], self.mcps[num].img_bool),
-                points, size=3, color=128
+                points, size=2, color=128
                 )
             for num, points in zip(self.mcp_seg_num, self.mcp_seg_points)
         ])
 
     def get_slices(self, stage, num, dim):
-        start, end = int(stage.real_mid_num - num / 2), int(stage.real_mid_num + num / 2)
+        start, end = int(self.real_mid_num - num / 2), int(self.real_mid_num + num / 2)
         slices = self.nii.get_slice(start, end, dim)
         rot_matrix = cv2.getRotationMatrix2D(
-            process.get_revese_point(stage.up_brainstem_point),
+            process.get_revese_point(self.up_brainstem_point),
             self.angle, 1
         )
         rot_shape = (stage.mid_img.shape[1], stage.mid_img.shape[0])
@@ -187,3 +191,40 @@ class SecondStageProcess(BaseStageProcess):
         if inf_limit < abs(up_point[0] - ext_point[0]) < sup_limit:
             return process.get_distance(up_point, down_point)
         return 0
+
+    def get_real_slice_num(self, num):
+        start = int(self.real_mid_num - self.para['get_slices']['num'] / 2)
+        return start + num
+
+    def sitk_add(self, canvas):
+        slices = [slice(dim+1) for dim in canvas.shape]
+        rot_matrix = cv2.getRotationMatrix2D(
+            process.get_revese_point(self.up_brainstem_point),
+            -self.angle, 1
+        )
+        rot_shape = (self.mask.shape[1], self.mask.shape[0])
+        for num, points, length in zip(self.mcp_seg_num, self.mcp_seg_points, self.mcp_length):
+            if length:
+                slices[self.para['get_slices']['dim']] = self.get_real_slice_num(num)
+                mcp_slice = canvas[slices]
+                mcp_point_slice = mcp_slice.copy()
+                mcp_slice[self.mcps[num].img_bool] = 2
+                mcp_slice = cv2.warpAffine(
+                    mcp_slice,
+                    rot_matrix,
+                    rot_shape,
+                    flags=cv2.INTER_LINEAR
+                ).astype(np.int32)
+                mcp_slice[np.where(mcp_slice == 1)] = 2
+
+                for point in points:
+                    mcp_point_slice[point] = 10
+                mcp_point_slice = cv2.warpAffine(
+                    mcp_point_slice,
+                    rot_matrix,
+                    rot_shape,
+                    flags=cv2.INTER_LINEAR
+                ).astype(np.int32)
+                mcp_slice[np.where(mcp_point_slice > 0)] = 1
+
+                canvas[slices] = mcp_slice.astype(np.float32)
