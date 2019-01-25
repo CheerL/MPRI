@@ -4,14 +4,6 @@ from collections import deque
 
 from config import DATA_PATH
 
-class FileManager(object):
-    def __init__(self, path, file_type):
-        self.path = path
-        self.file_type = file_type
-
-    def load(self):
-        raise NotImplementedError()
-
 class DataManager(object):
     def __init__(self, data_path=DATA_PATH):
         self.data_path = data_path

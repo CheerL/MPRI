@@ -177,16 +177,16 @@ class FirstStageProcess(BaseStageProcess):
                 'clahe_row': config.CALHE_ROW,
             },
             'get_upper_brainstem': {
-                'bin_rate': 1.2
+                'bin_rate': 1.3
             },
             'get_brainstem': {
-                'bin_rate': 1.2,
+                'bin_rate': 1.3,
                 'min_area': 500,
                 'max_dis': 5,
             },
             'get_quad': {
                 'clahe_limit': 0.02,
-                'bin_rate': 1.2,
+                'bin_rate': 1.3,
                 'min_area': 15,
                 'max_area': 55,
                 'max_dis': 8,

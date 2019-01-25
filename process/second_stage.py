@@ -30,7 +30,7 @@ class SecondStageProcess(BaseStageProcess):
                 'width': 50
             },
             'get_mcp': {
-                'rate': 1.25
+                'rate': 1.1
             },
             'get_mcp_part': {
                 'left_rate': 1/2,
@@ -174,6 +174,7 @@ class SecondStageProcess(BaseStageProcess):
 
         components, _ = ConnectedComponent.get_connected_component(ext_img, min_area)
         assert components
+        components = sorted(components, key=lambda x: x.centroid[1], reverse=True) 
         ext_part = components[0]
         # process.show(ext_part)
         point = ext_part.get_bound_point('u')

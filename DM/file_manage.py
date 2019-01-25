@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import SimpleITK as sitk
 
-from DM.manager import DataManager, FileManager
-
 
 def nii_check_loaded(func):
     @wraps(func)
@@ -15,6 +13,16 @@ def nii_check_loaded(func):
         assert self.loaded, 'nii file not loaded'
         return func(self, *args, **kwargs)
     return wrapper
+
+
+class FileManager(object):
+    def __init__(self, path, file_type):
+        self.path = path
+        self.file_type = file_type
+
+    def load(self):
+        raise NotImplementedError()
+
 
 class NiiFileManager(FileManager):
     def __init__(self, path):
@@ -47,13 +55,31 @@ class NiiFileManager(FileManager):
         img_slice = self.img if dim is 0 else np.rollaxis(self.img, dim)
         return img_slice[start] if end is None else img_slice[start:end]
 
-
     @nii_check_loaded
     def show(self, pos, dim=0):
         plt.imshow(self.get_slice(pos, dim=dim), 'gray')
 
-class DataManagerNii(DataManager):
-    pass
+
+class RotatedNiiFileManager(NiiFileManager):
+    def load(self):
+        self.sitk_img = sitk.ReadImage(self.path)
+        self.img = np.rot90(
+            sitk.GetArrayFromImage(
+                self.sitk_img
+            ).astype(np.float32),
+            k=2, axes=(0, 1)
+        )
+        self.size = self.img.shape
+        self.loaded = True
+
+class LabelNiiFileManager(RotatedNiiFileManager):
+    def get_label(self, label, label_types):
+        if isinstance(label_types, int):
+            return label==label_types
+        elif isinstance(label_types, (list, tuple)):
+            return np.logical_or(*[
+                label==label_type for label_type in label_types
+            ])
 
 if __name__ == '__main__':
     pass

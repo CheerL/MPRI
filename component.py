@@ -2,6 +2,18 @@ import cv2
 import numpy as np
 import process
 
+def get_connected_component(img, min_area=0, sort=True):
+    _, label, stats, centroids = cv2.connectedComponentsWithStats(img)
+    components = [
+        ConnectedComponent(
+            label == level, level, stat,
+            process.get_revese_point(centroid.astype(np.int))
+        ) for level, (stat, centroid) in enumerate(zip(stats, centroids))
+        if stat[4] > min_area and level != 0
+    ]
+    if sort:
+        components = sorted(components, reverse=True)
+    return components, label
 
 class ConnectedComponent(object):
     def __init__(self, img, level, stat, centroid):
@@ -31,17 +43,7 @@ class ConnectedComponent(object):
 
     @staticmethod
     def get_connected_component(img, min_area=0, sort=True):
-        _, label, stats, centroids = cv2.connectedComponentsWithStats(img)
-        components = [
-            ConnectedComponent(
-                label == level, level, stat,
-                process.get_revese_point(centroid.astype(np.int))
-            ) for level, (stat, centroid) in enumerate(zip(stats, centroids))
-            if stat[4] > min_area and level != 0
-        ]
-        if sort:
-            components = sorted(components, reverse=True)
-        return components, label
+        get_connected_component(img, min_area, sort)
 
     @property
     def img_uint8(self):
@@ -60,24 +62,7 @@ class ConnectedComponent(object):
         return np.zeros(self.shape).astype(dtype)
 
     def get_bound_point(self, type_='l'):
-        y_pos, x_pos = np.where(self.img)
-        if type_ == 'l':
-            left_y = int(y_pos[np.where(x_pos == self.left)[0]].mean())
-            bound_point = (left_y, self.left)
-        elif type_ == 'r':
-            right_y = int(y_pos[np.where(x_pos == self.right-1)[0]].mean())
-            bound_point = (right_y, self.right-1)
-        elif type_ == 'u':
-            up_x = int(x_pos[np.where(y_pos == self.up)[0]].mean())
-            bound_point = (self.up, up_x)
-        elif type_ == 'd':
-            down_x = int(x_pos[np.where(y_pos == self.down-1)[0]].mean())
-            bound_point = (self.down-1, down_x)
-        elif 1 < len(type_) <= 4:
-            bound_point = [self.get_bound_point(each_type_) for each_type_ in type_]
-        else:
-            raise TypeError()
-        return bound_point
+        return process.get_bound_point(self.img, type_)
 
     def __contains__(self, point):
         if process.is_point(point):

@@ -63,6 +63,30 @@ def get_area_distance(img, point):
     distances = [get_distance(area_point, point) for area_point in area_points]
     return min(distances)
 
+def get_bound_point(image, type_='l'):
+    y_pos, x_pos = np.where(image)
+    if type_ == 'l':
+        left_x = x_pos.min()
+        left_y = int(y_pos[np.where(x_pos == left_x)[0]].mean())
+        bound_point = (left_y, left_x)
+    elif type_ == 'r':
+        right_x = x_pos.max()
+        right_y = int(y_pos[np.where(x_pos == right_x)[0]].mean())
+        bound_point = (right_y, right_x)
+    elif type_ == 'u':
+        up_y = y_pos.min()
+        up_x = int(x_pos[np.where(y_pos == up_y)[0]].mean())
+        bound_point = (up_y, up_x)
+    elif type_ == 'd':
+        down_y = y_pos.max()
+        down_x = int(x_pos[np.where(y_pos == down_y)[0]].mean())
+        bound_point = (down_y, down_x)
+    elif 1 < len(type_) <= 4:
+        bound_point = [get_bound_point(image, each_type_) for each_type_ in type_]
+    else:
+        raise TypeError()
+    return bound_point
+
 def get_side_contour(src, side='r'):
     img = src.copy()
     height, width = img.shape
