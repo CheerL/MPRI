@@ -6,6 +6,7 @@ from . import second_stage
 from . import third_stage
 from . import output
 
+
 def clear_bottleneck(image):
     height, width = image.shape
     for y in range(1,height-1):

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     label_nii = LabelNiiFileManager(args.label)
     label_nii.load()
     
-    mid_num, quad_seg_point, midbrain_area, pons_area = process.first_stage.run(
+    quad_seg_point, mid_num, pons_area, midbrain_area = process.first_stage.run(
         image_nii, label_nii
     )
     mcp_mean_width, mcp_show_info = process.second_stage.run(
@@ -31,14 +31,11 @@ if __name__ == "__main__":
         image_nii, label_nii, quad_seg_point, mid_num, show=args.show
     )
     if args.func == 'calc':
-        mrpi = (pons_area / midbrain_area) * (mcp_mean_width / scp_mean_width)
-        print('Pons area: {}, Midbrain area: {}, MCP width: {}, SCP width: {}, MRPI: {}'. format(
-            pons_area, midbrain_area, mcp_mean_width, scp_mean_width, mrpi
-        ))
+        process.output.calc(pons_area, midbrain_area, mcp_mean_width, scp_mean_width)
     elif args.func == 'seg':
         assert args.output
         assert args.show
-        process.output.save(
+        process.output.save_to_sitk(
             args.output, image_nii.size, mid_num,
             quad_seg_point, mcp_show_info, scp_show_info
         )

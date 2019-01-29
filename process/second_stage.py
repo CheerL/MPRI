@@ -1,10 +1,17 @@
+from typing import List, Tuple
+
 import numpy as np
 
 import component
 import process
+from config import Box, Mcp_seg_result, Mcp_show_info_item, Point
+from DM.file_manage import LabelNiiFileManager, RotatedNiiFileManager
 
 
-def _get_mcp_up_point(mcp, up, left, right):
+def _get_mcp_up_point(
+    mcp: component.ConnectedComponent,
+    up: int, left: int, right: int
+) -> Point:
     for y in range(up, up+50):
         if np.all(mcp.img[y, left:right]):
             # print(mcp.img[y, left:right], )
@@ -13,7 +20,7 @@ def _get_mcp_up_point(mcp, up, left, right):
     x = np.where(false_list == False)[0].mean()
     return y-1, left+int(x)
 
-def _get_mcp_down_point(mcp, right):
+def _get_mcp_down_point(mcp: component.ConnectedComponent, right: int) -> Point:
     allow_right = True
     y, x = mcp.get_bound_point('d')
     y_count = 0
@@ -47,27 +54,27 @@ def _get_mcp_down_point(mcp, right):
                     return y, x
 
 def is_mcp_slice(
-    label, medulla_label=27, scp_label=28,
-    max_medulla_vol=100, max_scp_vol=0
-):
+    label: np.ndarray, medulla_label: int=27, scp_label: int=28,
+    max_medulla_vol: int=100, max_scp_vol: int=0
+) -> bool:
     medulla = label == medulla_label
     scp = label == scp_label
     return medulla.sum() <= max_medulla_vol and scp.sum() <= max_scp_vol
 
 def get_mcp_seg_point(
-    image, label, quad_seg_point,
-    rate=0.8, midbrain_label=26, box=((10, 35), (-8, 8))
-):
-    midbrain = label == midbrain_label
-    midbrain_pos = np.where(midbrain)
-    midbrain_mean = image[midbrain_pos].mean()
-    midbrain_right = midbrain_pos[1].max()
+    image: np.ndarray, label: np.ndarray, quad_seg_point: Point,
+    rate: float=0.8, pons_label: int=26, box: Box=((10, 35), (-8, 8))
+) -> Mcp_seg_result:
+    pons = label == pons_label
+    pons_pos = np.where(pons)
+    pons_mean = image[pons_pos].mean()
+    pons_right = pons_pos[1].max()
     up = quad_seg_point[0]+box[0][0]
     down = quad_seg_point[0]+box[0][1]
-    left = midbrain_right+box[1][0]
-    right = midbrain_right+box[1][1]
+    left = pons_right+box[1][0]
+    right = pons_right+box[1][1]
 
-    bin_image = process.clear_bottleneck(image > (midbrain_mean * rate))
+    bin_image = process.clear_bottleneck(image > (pons_mean * rate))
     mask = np.zeros(image.shape, bool)
     mask[up:down, left:right] = True
     mcp = component.get_connected_component((bin_image*mask).astype(np.uint8))[0][0]
@@ -75,15 +82,15 @@ def get_mcp_seg_point(
     up_point = _get_mcp_up_point(mcp, up, left, right)
     return up_point, down_point, mcp
 
-def get_mcp_width(up_point, down_point):
+def get_mcp_width(up_point: Point, down_point: Point) -> float:
     return process.get_distance(up_point, down_point)
 
 def run(
-    image_nii, label_nii, quad_seg_point, mid_num,
-    midbrain_label=26, medulla_label=27, scp_label=28,
-    max_medulla_vol=100, max_scp_vol=0, num=13, rate=0.8,
-    box=((10, 35), (-8, 8)), show=False
-):
+    image_nii: RotatedNiiFileManager, label_nii: LabelNiiFileManager, quad_seg_point: Point, mid_num: int,
+    pons_label: int=26, medulla_label: int=27, scp_label: int=28,
+    max_medulla_vol: int=100, max_scp_vol: int=0, num: int=13, rate: float=0.8,
+    box: Box=((10, 35), (-8, 8)), show: bool=False
+) -> Tuple[int, List[Mcp_show_info_item]]:
     mcp_widths = []
     show_info = []
     for index, (image, label) in enumerate(zip(
@@ -93,7 +100,7 @@ def run(
         if is_mcp_slice(label):
             up_point, down_point, mcp = get_mcp_seg_point(
                 image, label, quad_seg_point,
-                rate=rate, midbrain_label=midbrain_label, box=box
+                rate=rate, pons_label=pons_label, box=box
             )
             mcp_widths.append(get_mcp_width(up_point, down_point))
             if show:
@@ -102,7 +109,10 @@ def run(
     mcp_mean_width = np.mean(mcp_widths)
     return mcp_mean_width, show_info
 
-def show(image_nii, show_info, mask_color=25, point_color=255):
+def show(
+    image_nii: RotatedNiiFileManager, show_info: List[Mcp_show_info_item],
+    mask_color: int=25, point_color: int=255
+) -> None:
     process.show([
         process.add_points(
             process.add_mask(

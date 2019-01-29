@@ -1,10 +1,21 @@
+from typing import List, Tuple
+
 import numpy as np
 import SimpleITK as sitk
 
+from config import Mcp_show_info_item, Point, Scp_show_info_item
+
+
+def calc(pons_area: int, midbrain_area: int, mcp_width: float, scp_width: float) -> None:
+    mrpi = (pons_area / midbrain_area) * (mcp_width / scp_width)
+    print('Pons area: {}, Midbrain area: {}, MCP width: {}, SCP width: {}, MRPI: {}'. format(
+        pons_area, midbrain_area, mcp_width, scp_width, mrpi
+    ))
+
 def save_to_sitk(
-    file_name, size, mid_num, quad_seg_point,
-    mcp_show_info, scp_show_info
-):
+    file_name: str, size: Tuple[int, int], mid_num: int, quad_seg_point: Point,
+    mcp_show_info: List[Mcp_show_info_item], scp_show_info: List[Scp_show_info_item]
+) -> None:
     result = np.zeros(size, dtype=np.uint8)
     # quad_seg_point
     result[quad_seg_point][mid_num] = 1

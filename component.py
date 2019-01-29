@@ -3,6 +3,9 @@ import numpy as np
 import process
 
 def get_connected_component(img, min_area=0, sort=True):
+    if img.dtype == bool:
+        img = img.astype(np.uint8)
+
     _, label, stats, centroids = cv2.connectedComponentsWithStats(img)
     components = [
         ConnectedComponent(

@@ -6,16 +6,14 @@ name = "pypi"
 [packages]
 simpleitk = "*"
 numpy = "*"
-tqdm = "*"
-opencv-python = "*"
+opencv-python = "==3.4.4.19"
 matplotlib = "*"
-scikit-image = "*"
-scipy = "*"
-retrying = "*"
 
 [dev-packages]
 pylint = "*"
 autopep8 = "*"
+jupyter = "*"
+v = {version = "*",editable = true}
 
 [requires]
 python_version = "3.6"

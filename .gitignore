@@ -1,6 +1,7 @@
 .git/**
 .vscode/**
 .ipynb_checkpoints/**
+.mypy_cache/**
 data/**
 log/**
 **/__pycache__/**

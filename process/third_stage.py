@@ -1,11 +1,15 @@
+from typing import List, Sequence, Tuple
+
 import cv2
 import numpy as np
 
 import component
 import process
+from config import Box, Point, Scp_components, Scp_show_info_item
+from DM.file_manage import LabelNiiFileManager, RotatedNiiFileManager
 
 
-def get_scp_sum(label_nii, quad_seg_point, scp_label=28):
+def get_scp_sum(label_nii: LabelNiiFileManager, quad_seg_point: Point, scp_label: int=28) -> int:
     quad_num = int(quad_seg_point[1])
 
     for num in range(quad_num-3, quad_num+5):
@@ -15,16 +19,16 @@ def get_scp_sum(label_nii, quad_seg_point, scp_label=28):
             return num-1
 
 def get_scp_components(
-    image, label, quad_point,
-    scp_label=28, midbrain_label=26, rate=0.95, box=((2, 13), (-10, 10))
-):
+    image: np.ndarray, label: np.ndarray, quad_point: Point,
+    scp_label: int=28, pons_label: int=26, rate: float=0.95, box: Box=((2, 13), (-10, 10))
+) -> Scp_components:
     mask_box = (
         slice(quad_point[0]+box[0][0], quad_point[0]+box[0][1]),
         slice(quad_point[1]+box[1][0], quad_point[1]+box[1][1])
     )
     mask = np.zeros(image.shape, bool)
     mask[mask_box] = True
-    scp = np.logical_or(label==scp_label, label==midbrain_label)
+    scp = np.logical_or(label==scp_label, label==pons_label)
     scp_mean = image[np.where(scp*mask)].mean()
     bin_scp = process.clear_bottleneck(image * mask > scp_mean * rate)
     components = component.get_connected_component(bin_scp.astype(np.uint8), 10)[0]
@@ -50,7 +54,10 @@ def get_scp_components(
     assert len(scp_components) == 2
     return scp_components
 
-def get_scp_width(component, min_width=2, max_width=10):
+def get_scp_width(
+    component: component.ConnectedComponent,
+    min_width: int=2, max_width: int=10
+) -> int:
     contours = cv2.findContours(
         component.img_uint8,
         cv2.RETR_TREE,
@@ -73,10 +80,11 @@ def get_scp_width(component, min_width=2, max_width=10):
     return width
 
 def run(
-    image_nii, label_nii, quad_seg_point, mid_num,
-    num=2, scp_label=28, midbrain_label=26, rate=0.95,
-    max_width=10, min_width=2, box=((2, 13), (-10, 10)), show=False
-):
+    image_nii: RotatedNiiFileManager, label_nii: LabelNiiFileManager,
+    quad_seg_point: Point, mid_num: int,
+    num: int=2, scp_label: int=28, pons_label: int=26, rate: float=0.95,
+    max_width: int=10, min_width: int=2, box: Box=((2, 13), (-10, 10)), show: bool=False
+) -> Tuple[float, List[Scp_show_info_item]]:
     scp_num = get_scp_sum(label_nii, quad_seg_point, scp_label=scp_label)
     quad_point = (quad_seg_point[0], mid_num)
     scp_widths = []
@@ -88,7 +96,7 @@ def run(
     )):
         scp_components = get_scp_components(
             image, label, quad_point,
-            scp_label=scp_label, midbrain_label=midbrain_label, rate=rate
+            scp_label=scp_label, pons_label=pons_label, rate=rate
         )
         if show:
             show_info.append((scp_num+index, scp_components))
@@ -100,7 +108,7 @@ def run(
     scp_mean_width = np.mean(scp_widths)
     return scp_mean_width, show_info
 
-def show(image_nii, show_info, mask_color=25):
+def show(image_nii: RotatedNiiFileManager, show_info: List[Scp_show_info_item], mask_color: int=25) -> None:
     process.show([
         process.add_mask(
             process.add_mask(
