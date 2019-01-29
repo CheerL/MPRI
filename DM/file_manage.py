@@ -32,10 +32,10 @@ class NiiFileManager(FileManager):
         self.sitk_img = None
         self.img = None
 
-    def load(self):
+    def load(self, dtype=np.float32):
         self.sitk_img = sitk.ReadImage(self.path)
         self.size = self.sitk_img.GetSize()
-        self.img = sitk.GetArrayFromImage(self.sitk_img).astype(np.float32)
+        self.img = sitk.GetArrayFromImage(self.sitk_img).astype(dtype)
         self.loaded = True
 
     def normalize(self):
@@ -61,18 +61,15 @@ class NiiFileManager(FileManager):
 
 
 class RotatedNiiFileManager(NiiFileManager):
-    def load(self):
-        self.sitk_img = sitk.ReadImage(self.path)
-        self.img = np.rot90(
-            sitk.GetArrayFromImage(
-                self.sitk_img
-            ).astype(np.float32),
-            k=2, axes=(0, 1)
-        )
+    def load(self, dtype=np.float32):
+        super().load(dtype=dtype)
+        self.img = np.rot90(self.img, k=2, axes=(0, 1))
         self.size = self.img.shape
-        self.loaded = True
 
 class LabelNiiFileManager(RotatedNiiFileManager):
+    def load(self, dtype=np.uint8):
+        return super().load(dtype=dtype)
+
     def get_label(self, label, label_types):
         if isinstance(label_types, int):
             return label==label_types
@@ -80,6 +77,9 @@ class LabelNiiFileManager(RotatedNiiFileManager):
             return np.logical_or(*[
                 label==label_type for label_type in label_types
             ])
+
+    def normalize(self):
+        print('label cannot be normalized')
 
 if __name__ == '__main__':
     pass

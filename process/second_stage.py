@@ -1,231 +1,113 @@
-import cv2
 import numpy as np
 
+import component
 import process
-from component import ConnectedComponent
-from process.base_stage import BaseStageProcess
 
 
-class SecondStageProcess(BaseStageProcess):
-    def __init__(self):
-        self.angle = None
-        self.mask = None
-        self.mcps = None
-        self.mcp_seg_points = None
-        self.mcp_seg_num = None
-        self.mcp_length = None
-        self.mcp_mean_length = None
-        self.real_mid_num = None
-        self.up_brainstem_point = None
-        super().__init__()
+def _get_mcp_up_point(mcp, up, left, right):
+    for y in range(up, up+50):
+        if np.all(mcp.img[y, left:right]):
+            # print(mcp.img[y, left:right], )
+            break
+    false_list = mcp.img[y-1, left:right]
+    x = np.where(false_list == False)[0].mean()
+    return y-1, left+int(x)
 
-    def init_para(self):
-        return {
-            'get_slices': {
-                'num': 30,
-                'dim': 2
-            },
-            'get_region_mask': {
-                'height': 40,
-                'width': 50
-            },
-            'get_mcp': {
-                'rate': 1.1
-            },
-            'get_mcp_part': {
-                'left_rate': 1/2,
-                'right_rate': 1/5,
-                'min_area': 10
-            },
-            'get_mcp_part_seg_point': {
-                'min_dis': 0,
-                'quality': 0.001
-            },
-            'get_mcp_ext_seg_point': {
-                'min_area': 5,
-                'right_rate': 1/5,
-                'min_dis': 1
-            },
-            'get_mcp_slice_length': {
-                'sup_limit': 15,
-                'inf_limit': 3
-            }
-        }
+def _get_mcp_down_point(mcp, right):
+    allow_right = True
+    y, x = mcp.get_bound_point('d')
+    y_count = 0
+    x_count = 0
+    max_y_count = 3
+    max_x_count = 3
+    while True:
+        if mcp.img[y, x]:
+            x += 1
+        else:
+            if not mcp.img[y-1, x]:
+                y -= 1
+                y_count += 1
+                x_count = 0
+            elif y_count > max_y_count:
+                if mcp.img[y, x-1]:
+                    return y, x
+                else:
+                    x -= 1
+            else:
+                y_count = 0
+                if x == right - 1 or x_count == max_x_count:
+                    allow_right = False
+                if allow_right and not mcp.img[y, x+1]:
+                    x += 1
+                    x_count += 1
+                elif not mcp.img[y, x-1]:
+                    x -= 1
+                    allow_right = False
+                else:
+                    return y, x
 
-    def run(self, nii, stage):
-        self.nii = nii
-        self.real_mid_num = stage.real_mid_num
-        self.up_brainstem_point = stage.up_brainstem_point
-        self.angle = self.get_rotate_angle(stage)
-        self.slices = self.get_slices(stage)
-        self.slice_normalize()
-        self.mask = self.get_region_mask(
-            stage.mid_img.shape, stage.up_brainstem_point
-        )
-        self.mcps = [
-            self.get_mcp(img) for img in self.slices
-        ]
-        self.mcp_seg_points = []
-        self.mcp_seg_num = []
-        for num, mcp in enumerate(self.mcps):
-            try:
-                points = self.get_mcp_seg_point(mcp)
-                self.mcp_seg_points.append(points)
-                self.mcp_seg_num.append(num)
-            except AssertionError:
-                pass
+def is_mcp_slice(
+    label, medulla_label=27, scp_label=28,
+    max_medulla_vol=100, max_scp_vol=0
+):
+    medulla = label == medulla_label
+    scp = label == scp_label
+    return medulla.sum() <= max_medulla_vol and scp.sum() <= max_scp_vol
 
-        self.mcp_length = [
-            self.get_mcp_slice_length(*points) for points in self.mcp_seg_points
-        ]
-        self.mcp_mean_length = np.mean([length for length in self.mcp_length if length > 0])
+def get_mcp_seg_point(
+    image, label, quad_seg_point,
+    rate=0.8, midbrain_label=26, box=((10, 35), (-8, 8))
+):
+    midbrain = label == midbrain_label
+    midbrain_pos = np.where(midbrain)
+    midbrain_mean = image[midbrain_pos].mean()
+    midbrain_right = midbrain_pos[1].max()
+    up = quad_seg_point[0]+box[0][0]
+    down = quad_seg_point[0]+box[0][1]
+    left = midbrain_right+box[1][0]
+    right = midbrain_right+box[1][1]
 
-    def show(self):
-        process.show([
-            process.add_points(
-                process.add_mask(self.slices[num], self.mcps[num].img_bool),
-                points, size=2, color=128
-                )
-            for num, points in zip(self.mcp_seg_num, self.mcp_seg_points)
-        ])
+    bin_image = process.clear_bottleneck(image > (midbrain_mean * rate))
+    mask = np.zeros(image.shape, bool)
+    mask[up:down, left:right] = True
+    mcp = component.get_connected_component((bin_image*mask).astype(np.uint8))[0][0]
+    down_point = _get_mcp_down_point(mcp, right)
+    up_point = _get_mcp_up_point(mcp, up, left, right)
+    return up_point, down_point, mcp
 
-    def get_slices(self, stage, num, dim):
-        start, end = int(self.real_mid_num - num / 2), int(self.real_mid_num + num / 2)
-        slices = self.nii.get_slice(start, end, dim)
-        rot_matrix = cv2.getRotationMatrix2D(
-            process.get_revese_point(self.up_brainstem_point),
-            self.angle, 1
-        )
-        rot_shape = (stage.mid_img.shape[1], stage.mid_img.shape[0])
-        return [
-            cv2.warpAffine(
-                img,
-                rot_matrix,
-                rot_shape,
-                flags=cv2.INTER_LINEAR
-            ) for img in slices
-        ]
+def get_mcp_width(up_point, down_point):
+    return process.get_distance(up_point, down_point)
 
-    def get_rotate_angle(self, stage):
-        point_1, point_2 = stage.mid_corpus.get_bound_point('lr')
-        return process.get_angle(point_1, point_2)
+def run(
+    image_nii, label_nii, quad_seg_point, mid_num,
+    midbrain_label=26, medulla_label=27, scp_label=28,
+    max_medulla_vol=100, max_scp_vol=0, num=13, rate=0.8,
+    box=((10, 35), (-8, 8)), show=False
+):
+    mcp_widths = []
+    show_info = []
+    for index, (image, label) in enumerate(zip(
+        image_nii.get_slice(mid_num-num, mid_num+num, dim=2),
+        label_nii.get_slice(mid_num-num, mid_num+num, dim=2)
+    )):
+        if is_mcp_slice(label):
+            up_point, down_point, mcp = get_mcp_seg_point(
+                image, label, quad_seg_point,
+                rate=rate, midbrain_label=midbrain_label, box=box
+            )
+            mcp_widths.append(get_mcp_width(up_point, down_point))
+            if show:
+                show_info.append((mid_num-num+index, (up_point, down_point, mcp)))
 
-    def get_region_mask(self, shape, point, height, width):
-        return process.get_rect_mask(shape, point, height, width, 180)
+    mcp_mean_width = np.mean(mcp_widths)
+    return mcp_mean_width, show_info
 
-    def get_mcp(self, img, rate, test=False):
-        masked_img = img * self.mask
-        otsu = process.get_otsu(process.get_limit_img(masked_img))
-        bin_img = process.get_binary_image(masked_img, otsu * rate)
-        components, label = ConnectedComponent.get_connected_component(bin_img)
-        mcp = components[0]
-
-        if test:
-            test_data = {
-                'masked_img': masked_img,
-                'bin_img': bin_img,
-                'otsu': otsu,
-                'label': label,
-            }
-            return mcp, test_data
-        return mcp
-
-    def get_mcp_part(self, mcp, left_rate, right_rate, min_area):
-        left_bound = int((1-left_rate) * mcp.left + left_rate * mcp.right)
-        right_bound = int(right_rate * mcp.left + (1-right_rate) * mcp.right)
-        part_img = mcp.canvas
-        for y in range(mcp.up, mcp.down):
-            for x in range(left_bound, right_bound):
-                if not mcp.img[y, x]:
-                    part_img[y, x] = 255
-        part_img[mcp.up-1, left_bound:right_bound] = 255
-        part_img[mcp.down, left_bound:right_bound] = 255
-        # process.show(part_img)
-        components, _ = ConnectedComponent.get_connected_component(part_img, min_area)
-        assert len(components) == 2
-        return sorted(components, key=lambda x: x.centroid[0])
-
-    def get_mcp_part_seg_point(self, component, type_, min_dis, quality):
-        assert type_ in ['u', 'd']
-        points = [
-            process.get_revese_point(point)
-            for point in np.concatenate(
-                cv2.goodFeaturesToTrack(
-                    component.img_uint8,
-                    10, quality, 2
-                ).astype(int)
-            ) if component.left + min_dis <= point[0] < component.right - min_dis
-        ]
-        assert points
-        points = sorted(
-            points,
-            key=lambda x: x[0],
-            reverse=True if type_ == 'u' else False
-        )
-        return points[0]
-
-    def get_mcp_ext_seg_point(self, mcp, point, right_rate, min_area, min_dis):
-        ext_img = mcp.canvas
-        right_bound = int(right_rate * mcp.left + (1-right_rate) * mcp.right)
-        for y in range(mcp.up, point[0]):
-            for x in range(point[1], right_bound):
-                if mcp.img[y, x]:
-                    ext_img[y, x] = 255
-
-        components, _ = ConnectedComponent.get_connected_component(ext_img, min_area)
-        assert components
-        components = sorted(components, key=lambda x: x.centroid[1], reverse=True) 
-        ext_part = components[0]
-        # process.show(ext_part)
-        point = ext_part.get_bound_point('u')
-        assert point[1] - ext_part.left >= min_dis
-        return point
-
-    def get_mcp_seg_point(self, mcp):
-        [up_part, down_part] = self.get_mcp_part(mcp)
-        up_point = self.get_mcp_part_seg_point(up_part, type_='u')
-        down_point = self.get_mcp_part_seg_point(down_part, type_='d')
-        ext_point = self.get_mcp_ext_seg_point(mcp, up_point)
-        return up_point, down_point, ext_point
-
-    def get_mcp_slice_length(self, up_point, down_point, ext_point, sup_limit, inf_limit):
-        if inf_limit < abs(up_point[0] - ext_point[0]) < sup_limit:
-            return process.get_distance(up_point, down_point)
-        return 0
-
-    def get_real_slice_num(self, num):
-        start = int(self.real_mid_num - self.para['get_slices']['num'] / 2)
-        return start + num
-
-    def sitk_add(self, canvas):
-        slices = [slice(dim+1) for dim in canvas.shape]
-        rot_matrix = cv2.getRotationMatrix2D(
-            process.get_revese_point(self.up_brainstem_point),
-            -self.angle, 1
-        )
-        rot_shape = (self.mask.shape[1], self.mask.shape[0])
-        for num, points, length in zip(self.mcp_seg_num, self.mcp_seg_points, self.mcp_length):
-            if length:
-                slices[self.para['get_slices']['dim']] = self.get_real_slice_num(num)
-                mcp_slice = canvas[slices]
-                mcp_point_slice = mcp_slice.copy()
-                mcp_slice[self.mcps[num].img_bool] = 2
-                mcp_slice = cv2.warpAffine(
-                    mcp_slice,
-                    rot_matrix,
-                    rot_shape,
-                    flags=cv2.INTER_LINEAR
-                ).astype(np.int32)
-                mcp_slice[np.where(mcp_slice == 1)] = 2
-
-                for point in points:
-                    mcp_point_slice[point] = 10
-                mcp_point_slice = cv2.warpAffine(
-                    mcp_point_slice,
-                    rot_matrix,
-                    rot_shape,
-                    flags=cv2.INTER_LINEAR
-                ).astype(np.int32)
-                mcp_slice[np.where(mcp_point_slice > 0)] = 1
-
-                canvas[slices] = mcp_slice.astype(np.float32)
+def show(image_nii, show_info, mask_color=25, point_color=255):
+    process.show([
+        process.add_points(
+            process.add_mask(
+                image_nii.get_slice(index, dim=2),
+                mcp.img_bool, mask_color
+            ), (up, down), 1, point_color
+        ) for index, (up, down, mcp) in show_info
+    ])
