@@ -87,8 +87,8 @@ def get_mcp_width(up_point: Point, down_point: Point) -> float:
 
 def run(
     image_nii: RotatedNiiFileManager, label_nii: LabelNiiFileManager, quad_seg_point: Point, mid_num: int,
-    pons_label: int=26, medulla_label: int=27, scp_label: int=28,
-    max_medulla_vol: int=100, max_scp_vol: int=0, num: int=13, rate: float=0.8,
+    pons_label: int=26, medulla_label: int=27, scp_label: int=28, num: int=13, rate: float=0.8,
+    max_medulla_vol: int=200, max_scp_vol: int=0, min_dis: int=3, max_dis: int=13,
     box: Box=((10, 35), (-8, 8)), show: bool=False
 ) -> Tuple[int, List[Mcp_show_info_item]]:
     mcp_widths = []
@@ -97,14 +97,18 @@ def run(
         image_nii.get_slice(mid_num-num, mid_num+num, dim=2),
         label_nii.get_slice(mid_num-num, mid_num+num, dim=2)
     )):
-        if is_mcp_slice(label):
+        if is_mcp_slice(
+            label, medulla_label=medulla_label, scp_label=scp_label,
+            max_medulla_vol=max_medulla_vol, max_scp_vol=max_scp_vol
+        ):
             up_point, down_point, mcp = get_mcp_seg_point(
                 image, label, quad_seg_point,
                 rate=rate, pons_label=pons_label, box=box
             )
-            mcp_widths.append(get_mcp_width(up_point, down_point))
-            if show:
-                show_info.append((mid_num-num+index, (up_point, down_point, mcp)))
+            if min_dis <= mcp.down - down_point[0] <= max_dis:
+                mcp_widths.append(get_mcp_width(up_point, down_point))
+                if show:
+                    show_info.append((mid_num-num+index, (up_point, down_point, mcp)))
 
     mcp_mean_width = np.mean(mcp_widths)
     return mcp_mean_width, show_info
