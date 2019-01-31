@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-import process
 
 def get_connected_component(img, min_area=0, sort=True):
+    import process
     if img.dtype == bool:
         img = img.astype(np.uint8)
 
@@ -24,9 +24,9 @@ class ConnectedComponent(object):
         self.shape = img.shape
         self.level = level
         self.left = stat[0]
-        self.right = stat[0] + stat[2]
+        self.right = stat[0] + stat[2] - 1
         self.up = stat[1]
-        self.down = stat[1] + stat[3]
+        self.down = stat[1] + stat[3] - 1
         self.area = stat[4]
         self.centroid = centroid
         self.info = None
@@ -65,12 +65,13 @@ class ConnectedComponent(object):
         return np.zeros(self.shape).astype(dtype)
 
     def get_bound_point(self, type_='l'):
+        import process
         return process.get_bound_point(self.img, type_)
 
-    def __contains__(self, point):
-        if process.is_point(point):
-            return self.up <= point[0] < self.down and self.left <= point[1] < self.right
-        return False
+    # def __contains__(self, point):
+    #     if process.is_point(point):
+    #         return self.up <= point[0] < self.down and self.left <= point[1] < self.right
+    #     return False
 
     def in_range(self, left=None, right=None, up=None, down=None):
         if left is not None and left > self.left:

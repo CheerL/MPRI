@@ -9,8 +9,8 @@ from DM.file_manage import LabelNiiFileManager, RotatedNiiFileManager
 
 
 def get_mid_num(
-    label_nii: LabelNiiFileManager, rate: float=0.2,
-    left_ventricle_label: int=8, right_ventricle_label:int =9
+    label_nii: LabelNiiFileManager, rate: float=0.08,
+    midbrain_label: int=25
 ) -> int:
     size = label_nii.size[2]
     min_volum = 500
@@ -19,10 +19,8 @@ def get_mid_num(
         end=int((1+rate)*size/2),
         dim=2
     )):
-        volum = np.logical_or(
-            label==left_ventricle_label,
-            label==right_ventricle_label
-        ).sum()
+        volum = (label == midbrain_label).sum()
+        # print(volum, num)
         if volum < min_volum:
             min_volum = volum
             mid_num = int((1-rate)*size/2) + num
@@ -73,14 +71,12 @@ def get_midbrain_area(label: np.ndarray, midbrain_label: int=25) -> int:
 
 def run(
     image_nii: RotatedNiiFileManager, label_nii: LabelNiiFileManager,
-    mid_num_rate: float=0.2, quad_seg_rate: float=1.2,
-    left_ventricle_label: int=8, right_ventricle_label: int=9,
+    mid_num_rate: float=0.08, quad_seg_rate: float=1.2,
     midbrain_label: int=25, pons_label: int=26,
     box: Box=((-20, 10), (-10, 10))
 ) -> Tuple[Point, int, int, int]:
     mid_num = get_mid_num(
-        label_nii, rate=mid_num_rate,
-        left_ventricle_label=left_ventricle_label, right_ventricle_label=right_ventricle_label,
+        label_nii, rate=mid_num_rate, midbrain_label=midbrain_label,
     )
     mid_image = image_nii.get_slice(mid_num, dim=2)
     mid_label = label_nii.get_slice(mid_num, dim=2)
