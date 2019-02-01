@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     label_nii = LabelNiiFileManager(args.label)
     label_nii.load()
-    
+
     quad_seg_point, mid_num, pons_area, midbrain_area = process.first_stage.run(
         image_nii, label_nii
     )

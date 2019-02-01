@@ -9,7 +9,7 @@ from DM.file_manage import LabelNiiFileManager, RotatedNiiFileManager
 
 
 def get_mid_num(
-    label_nii: LabelNiiFileManager, rate: float=0.08,
+    label_nii: LabelNiiFileManager, rate: float=0.06,
     midbrain_label: int=25
 ) -> int:
     size = label_nii.size[2]
@@ -29,25 +29,32 @@ def get_mid_num(
 
 def get_quad_seg_point(
     image: np.ndarray, label: np.ndarray,
-    midbrain_label: int=25, rate: float=1.2,
-    box: Box=((-20, 10), (-10, 10))
+    midbrain_label: int=25, rate: float=1.21,
+    box: Box=((-15, 6), (-8, 8)), debug: bool=False
 ) -> Point:
+    assert rate > 1
     right_bound = process.get_bound_point(label==midbrain_label, 'r')
     box_index = (
         slice(right_bound[0]+box[0][0], right_bound[0]+box[0][1]),
         slice(right_bound[1]+box[1][0], right_bound[1]+box[1][1])
     )
     otsu = process.get_otsu(image[box_index])
-    bin_image = image > otsu*rate
+    bin_image = image > otsu * rate
     components, _ = component.get_connected_component(bin_image[box_index])
     components = sorted(
-        [component for component in components],
+        [component for component in components if not component.img[box[0][1] - box[0][0] - 1].any()],
         key=lambda component: process.get_area_distance(
             component.img,
             (-box[0][0], -box[1][0])
         )
     )
-    boxed_quad_seg_point = components[1].get_bound_point('d')
+    if debug:
+        process.show([bin_image] + components)
+    if not components:
+        return get_quad_seg_point(image, label, midbrain_label, rate+0.02, box, debug)
+    if components[0].img.sum() < 8:
+        return get_quad_seg_point(image, label, midbrain_label, rate-0.02, box, debug)
+    boxed_quad_seg_point = components[0].get_bound_point('d')
     quad_seg_point = (
         boxed_quad_seg_point[0]+right_bound[0]+box[0][0],
         boxed_quad_seg_point[1]+right_bound[1]+box[1][0]
@@ -71,9 +78,9 @@ def get_midbrain_area(label: np.ndarray, midbrain_label: int=25) -> int:
 
 def run(
     image_nii: RotatedNiiFileManager, label_nii: LabelNiiFileManager,
-    mid_num_rate: float=0.08, quad_seg_rate: float=1.2,
+    mid_num_rate: float=0.06, quad_seg_rate: float=1.21,
     midbrain_label: int=25, pons_label: int=26,
-    box: Box=((-20, 10), (-10, 10))
+    box: Box=((-15, 6), (-8, 8)), debug: bool=False
 ) -> Tuple[Point, int, int, int]:
     mid_num = get_mid_num(
         label_nii, rate=mid_num_rate, midbrain_label=midbrain_label,
@@ -82,7 +89,7 @@ def run(
     mid_label = label_nii.get_slice(mid_num, dim=2)
     quad_seg_point = get_quad_seg_point(
         mid_image, mid_label, rate=quad_seg_rate,
-        midbrain_label=midbrain_label, box=box
+        midbrain_label=midbrain_label, box=box, debug=debug
     )
     midbrain_area = get_midbrain_area(mid_label, midbrain_label=midbrain_label)
     pons_area = get_pons_area(mid_label, pons_label=pons_label)

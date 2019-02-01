@@ -103,38 +103,38 @@ def get_bound_point(image, type_='l'):
         raise TypeError()
     return bound_point
 
-# def get_side_contour(src, side='r'):
-#     img = src.copy()
-#     height, width = img.shape
-#     if side == 'r':
-#         for y in range(height):
-#             for x in range(width):
-#                 if img[y, x:].any():
-#                     img[y, x] = img.max()
-#                 else:
-#                     break
-#     elif side == 'l':
-#         for y in range(height):
-#             for x in range(width-1, 0, -1):
-#                 if img[y, :x].any():
-#                     img[y, x] = img.max()
-#                 else:
-#                     break
-#     elif side == 'u':
-#         for x in range(width):
-#             for y in range(height-1, 0, -1):
-#                 if img[:y, x].any():
-#                     img[y, x] = img.max()
-#                 else:
-#                     break
-#     elif side == 'd':
-#         for x in range(width):
-#             for y in range(height):
-#                 if img[y:, x].any():
-#                     img[y, x] = img.max()
-#                 else:
-#                     break
-#     return img
+def get_side_contour(src, side='r'):
+    img = src.copy()
+    height, width = img.shape
+    if side == 'r':
+        for y in range(height):
+            for x in range(width):
+                if img[y, x:].any():
+                    img[y, x] = img.max()
+                else:
+                    break
+    elif side == 'l':
+        for y in range(height):
+            for x in range(width-1, 0, -1):
+                if img[y, :x].any():
+                    img[y, x] = img.max()
+                else:
+                    break
+    elif side == 'u':
+        for x in range(width):
+            for y in range(height-1, 0, -1):
+                if img[:y, x].any():
+                    img[y, x] = img.max()
+                else:
+                    break
+    elif side == 'd':
+        for x in range(width):
+            for y in range(height):
+                if img[y:, x].any():
+                    img[y, x] = img.max()
+                else:
+                    break
+    return img
 
 # def get_point_by_angle_and_distance(point, angle, distance):
 #     point_y, point_x = point
