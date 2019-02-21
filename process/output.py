@@ -6,11 +6,18 @@ import SimpleITK as sitk
 from config import Mcp_show_info_item, Point, Scp_show_info_item
 
 
-def calc(pons_area: int, midbrain_area: int, mcp_width: float, scp_width: float) -> None:
+def calc(
+    pons_area: int, midbrain_area: int, mcp_width: float, scp_width: float, file_name: str=None
+) -> None:
     mrpi = (pons_area / midbrain_area) * (mcp_width / scp_width)
-    print('Pons area: {}, Midbrain area: {}, MCP width: {}, SCP width: {}, MRPI: {}'. format(
+    report = 'Pons area: {}, Midbrain area: {}, MCP width: {}, SCP width: {}, MRPI: {}'. format(
         pons_area, midbrain_area, mcp_width, scp_width, mrpi
-    ))
+    )
+    if file_name:
+        with open(file_name, 'w+') as file:
+            file.write(report)
+    else:
+        print(report)
 
 def save_to_sitk(
     file_name: str, size: Tuple[int, int], mid_num: int, quad_seg_point: Point,

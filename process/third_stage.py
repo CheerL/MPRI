@@ -33,9 +33,9 @@ def _get_peak(image: np.ndarray, start: int, end: int) -> Tuple[int, int]:
 def get_scp_sum(label_nii: LabelNiiFileManager, quad_seg_point: Point, scp_label: int=28) -> int:
     quad_num = int(quad_seg_point[1])
 
-    for num in range(quad_num, quad_num+5):
+    for num in range(quad_num-3, quad_num+5):
         label = label_nii.get_slice(num, dim=1)
-        scp = label==scp_label
+        scp = label == scp_label
         if scp.sum():
             return num
     # return quad_num
@@ -252,18 +252,25 @@ def run(
     scp_widths_list = []
     show_info = []
 
+    count = 0
     for index, (image, label) in enumerate(zip(
-        image_nii.get_slice(scp_num, scp_num+num, dim=1),
-        label_nii.get_slice(scp_num, scp_num+num, dim=1)
+        image_nii.get_slice(scp_num, scp_num+5, dim=1),
+        label_nii.get_slice(scp_num, scp_num+5, dim=1)
     )):
-        scp_components, scp_widths = get_scp_components(
-            image, label, quad_point, accubrain=False, box=box,
-            scp_label=scp_label, pons_label=pons_label, rate=rate, debug=debug,
-            max_width=max_width, min_width=min_width
-        )
-        scp_widths_list.append(scp_widths)
-        if show:
-            show_info.append((scp_num+index, scp_components))
+        try:
+            scp_components, scp_widths = get_scp_components(
+                image, label, quad_point, accubrain=False, box=box,
+                scp_label=scp_label, pons_label=pons_label, rate=rate, debug=debug,
+                max_width=max_width, min_width=min_width
+            )
+            scp_widths_list.append(scp_widths)
+            if show:
+                show_info.append((scp_num+index, scp_components))
+            count += 1
+            if count >= 2:
+                break
+        except AssertionError:
+            pass
 
     scp_mean_width = np.mean(scp_widths_list)
     return scp_mean_width, show_info
