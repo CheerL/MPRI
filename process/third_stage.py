@@ -96,7 +96,6 @@ def get_scp_components(
             x -= 1
         else:
             corner = cere_pon.img[y+1:y+enhance_y+1, x-enhance_x+1:x+1]
-            # print(corner)
             if corner.all():
                 break
             else:
@@ -166,7 +165,6 @@ def get_scp_components(
             box=box, enhance_y=enhance_y, enhance_x=enhance_x, debug=debug,
             max_width=max_width, min_width=min_width
         )
-    # print(big_component.right - big_component.left, center_row_seg, center_y)
     if big_component.right - big_component.left > 15 or len(components) < 2:
         big_component.img[
             center_y-1:,
@@ -236,7 +234,6 @@ def get_scp_width(
         process.get_distance(box[0], box[2]),
         process.get_distance(box[0], box[3])
     )
-    # print(box)
     assert width < max_width
     assert min_width < width
     return width

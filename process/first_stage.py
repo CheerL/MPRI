@@ -1,3 +1,4 @@
+from __future__ import division
 from typing import Tuple
 
 import numpy as np
@@ -20,7 +21,6 @@ def get_mid_num(
         dim=2
     )):
         volum = (label == midbrain_label).sum()
-        # print(volum, num)
         if volum < min_volum:
             min_volum = volum
             mid_num = int((1-rate)*size/2) + num

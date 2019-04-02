@@ -5,12 +5,24 @@ import argparse
 from DM.file_manage import RotatedNiiFileManager, LabelNiiFileManager
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=['calc', 'seg', 'both'])
-    parser.add_argument('-i', '--image', required=True)
-    parser.add_argument('-l', '--label', required=True)
-    parser.add_argument('-o', '--output')
-    parser.add_argument('-d', '--data')
+    parser = argparse.ArgumentParser(description='A fast algorithm to calculate MPRI')
+    parser.add_argument('mode', choices=['calc', 'seg', 'both'], help='''
+    calc:                   Calculate and output the pons area, midbrain area, MCP
+                            width, SCP width and MPRI.
+    seg:                    Segment MCP, SCP and save to output image but not
+                            calculate MPRI, etc. Note that --output OUTPUT must be
+                            given in this mode.
+    both:                   Equal to runing both calc mode and seg mode.
+    ''')
+    parser.add_argument('-i', '--image', required=True, help='The image path IMAGE to be segmented or calculated.')
+    parser.add_argument('-l', '--label', required=True, help='''The lable path LABLE of correspounding image
+                            from AccuBrain.''')
+    parser.add_argument('-o', '--output', help='''The output path OUTPUT to save segmentation results.
+                            It must be given if the mode is seg or both and does
+                            not work if the mode is calc.''')
+    parser.add_argument('-d', '--data', help='''The output path DATA to save calculation results. If
+                            given, calculation results would be saved to DATA,
+                            otherwise shown in the screen.''')
     args = parser.parse_args()
     assert os.path.isfile(args.label)
     assert os.path.isfile(args.image)
@@ -46,4 +58,4 @@ if __name__ == "__main__":
         )
         process.output.calc(pons_area, midbrain_area, mcp_mean_width, scp_mean_width, file_name=args.data)
     else:
-        raise TypeError('mode must be one of {calc, seg, both}')
+        parser.print_help()

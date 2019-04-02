@@ -1,3 +1,4 @@
+from __future__ import division
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,39 +41,6 @@ def get_otsu(img, only_otsu=True):
     if only_otsu:
         return otsu
     return otsu, otsu_img
-
-# def get_binary_image(img, threshold):
-#     _, binary_image = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
-#     return binary_image
-
-# def get_limit_img(img):
-#     y_pos, x_pos = np.where(img)
-#     return img[min(y_pos):max(y_pos)+1, min(x_pos):max(x_pos)+1]
-
-# def get_grav_center(img):
-#     moments = cv2.moments(img)
-#     grav_center_x = int(moments['m10']/moments['m00'])
-#     grav_center_y = int(moments['m01']/moments['m00'])
-#     return grav_center_y, grav_center_x
-
-# def get_clahe_image(img, limit, row, col):
-#     height, width = img.shape
-#     clahe = cv2.createCLAHE(limit * 255, (int(height/row), int(width/col)))
-#     return clahe.apply(img)
-
-# def get_near_component(components, pos, limit, type_='point'):
-#     assert type_ in ('point', 'area')
-#     if type_ == 'point':
-#         near_component = [
-#             component for component in components
-#             if get_area_distance(component.img, pos) < limit
-#         ]
-#     elif type_ == 'area':
-#         near_component = [
-#             component for component in components
-#             if get_area_distance(pos, component.centroid) < limit
-#         ]
-#     return near_component
 
 def get_area_distance(img, point):
     area_points = list(zip(*np.where(img)))

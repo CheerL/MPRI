@@ -14,7 +14,6 @@ def _get_mcp_up_point(mcp: component.ConnectedComponent) -> Point:
     right = mcp.right
     for y in range(up, up+50):
         if np.all(mcp.img[y, left:right]):
-            # print(mcp.img[y, left:right], )
             break
     false_list = mcp.img[y-1, left:right]
     x = np.where(false_list == False)[0].mean()
@@ -24,7 +23,6 @@ def _get_mcp_down_point(mcp: component.ConnectedComponent, up_point: Point, max_
     up, left = up_point
     right = min(left + max_right, mcp.right)
     down = mcp.down
-    # print(down-up, right-left)
     distance = [
         ((y, x), process.get_distance((y, x), up_point))
         for y, x in product(range(up+1, down+1), range(left, right+1))
