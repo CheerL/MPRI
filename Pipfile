@@ -9,11 +9,5 @@ numpy = "*"
 opencv-python = "==3.4.4.19"
 matplotlib = "*"
 
-[dev-packages]
-pylint = "*"
-autopep8 = "*"
-jupyter = "*"
-v = {version = "*",editable = true}
-
 [requires]
-python_version = "3.6"
+python_version = "3"
