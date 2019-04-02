@@ -4,10 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-simpleitk = "*"
-numpy = "*"
-opencv-python = "==3.4.4.19"
-matplotlib = "*"
+simpleitk = "==1.2.0"
+numpy = "==1.16.2"
+opencv-python = "==4.0.0.21"
+matplotlib = "==3.0.3"
+
+[dev-packages]
+pylint = "*"
+autopep8 = "*"
 
 [requires]
-python_version = "3"
+python_version = "3.6"
